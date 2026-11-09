@@ -3,15 +3,21 @@ import { env } from './src/config/env';
 
 export default defineConfig({
   testDir: './tests',
+  globalSetup: './src/setup/global-setup.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  // The target is a shared public server: be gentle with it and tolerate a one-off hiccup.
+  // A test that passes only on retry is reported as "flaky" in the HTML report.
+  retries: process.env.CI ? 2 : 1,
+  workers: process.env.CI ? 2 : 4,
+  timeout: 60_000,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: env.baseURL,
     // Toolshop marks elements with data-test, so getByTestId('email') matches data-test="email"
     testIdAttribute: 'data-test',
+    actionTimeout: 15_000,
+    navigationTimeout: 45_000,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

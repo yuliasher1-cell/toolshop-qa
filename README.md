@@ -33,6 +33,11 @@ npm run report          # open the last HTML report
   unique user through the API (`newUser` fixture) instead of reusing `customer@...`.
 - **Random passwords.** The app checks passwords against known data leaks and answers 422 for
   common ones (even the example from its own docs), so every test user gets a generated password.
+- **Built for a flaky public target.** The Toolshop demo is shared and sometimes slow or down. A
+  global setup checks the target first and fails fast with one clear message; the suite runs with
+  a small number of workers, one retry locally (retried passes show up as "flaky" in the report)
+  and generous timeouts. Tests check the HTTP status before validating a schema, so a server error
+  is never mistaken for a contract violation.
 - **Contract tests with Zod.** Response schemas in `src/schemas/` are derived from the OpenAPI spec
   (`docs/openapi/`). `parseContract` reports every violated field in one readable error.
 - **Thin API client.** `ToolshopApi` returns raw responses; the tests decide what to assert.
@@ -45,7 +50,8 @@ src/config/     environment targets, public demo accounts
 src/api/        API client
 src/schemas/    Zod schemas + contract helper
 src/data/       test data factories
-src/fixtures/   custom Playwright fixtures (api, newUser)
+src/pages/      Page Objects (home, product, cart, login, header)
+src/fixtures/   custom Playwright fixtures (api, newUser, page objects)
 tests/api/      API + contract tests
 tests/ui/       browser tests
 docs/openapi/   Toolshop OpenAPI specification (reference)
@@ -55,7 +61,7 @@ docs/openapi/   Toolshop OpenAPI specification (reference)
 
 - [x] Stage 1: project skeleton, two targets, first UI and API smoke tests
 - [x] Stage 2: API client, Zod schemas, fixtures, auth + products contract tests
-- [ ] Stage 3: Page Objects, UI regression scenarios
+- [x] Stage 3: Page Objects, UI scenarios (catalog, cart, login)
 - [ ] Stage 4: hybrid tests (API login + storageState), accessibility, visual checks
 - [ ] Stage 5: GitHub Actions (sharding, HTML report on GitHub Pages)
 - [ ] Stage 6: bug reports, test strategy, optional AI failure summary
