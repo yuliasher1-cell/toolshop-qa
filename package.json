@@ -1,6 +1,6 @@
 {
   "name": "toolshop-qa",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Playwright + TypeScript QA framework (UI + API + contract) for the Toolshop demo app",
   "private": true,
   "scripts": {
@@ -17,6 +17,7 @@
     "@playwright/test": "^1.50.0",
     "@types/node": "^22.0.0",
     "cross-env": "^7.0.3",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "zod": "^3.23.8"
   }
 }
