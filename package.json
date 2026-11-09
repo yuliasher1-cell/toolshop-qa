@@ -1,0 +1,22 @@
+{
+  "name": "toolshop-qa",
+  "version": "0.1.0",
+  "description": "Playwright + TypeScript QA framework (UI + API + contract) for the Toolshop demo app",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:clean": "cross-env TARGET=clean playwright test",
+    "test:bugs": "cross-env TARGET=bugs playwright test",
+    "test:smoke": "playwright test --grep @smoke",
+    "test:api": "playwright test --project=api",
+    "test:ui": "playwright test --project=chromium",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "@types/node": "^22.0.0",
+    "cross-env": "^7.0.3",
+    "typescript": "^5.6.0"
+  }
+}
