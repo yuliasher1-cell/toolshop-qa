@@ -1,0 +1,60 @@
+name: Start Toolshop
+description: Starts the Toolshop demo app with Docker (UI on :4200, API on :8091) and seeds the database.
+
+inputs:
+  sprint-folder:
+    description: Which build to run. "sprint5" is the normal app, "sprint5-with-bugs" the buggy one.
+    default: sprint5
+
+runs:
+  using: composite
+  steps:
+    - name: Get Toolshop sources
+      shell: bash
+      run: git clone --depth 1 https://github.com/testsmith-io/practice-software-testing.git "$RUNNER_TEMP/toolshop"
+
+    - name: Select build
+      shell: bash
+      working-directory: ${{ runner.temp }}/toolshop
+      run: |
+        [ -f .env ] || { [ -f .env.example ] && cp .env.example .env; } || touch .env
+        if grep -q '^SPRINT_FOLDER=' .env; then
+          sed -i "s|^SPRINT_FOLDER=.*|SPRINT_FOLDER=${{ inputs.sprint-folder }}|" .env
+        else
+          echo "SPRINT_FOLDER=${{ inputs.sprint-folder }}" >> .env
+        fi
+        grep SPRINT_FOLDER .env
+
+    - name: Start containers
+      shell: bash
+      working-directory: ${{ runner.temp }}/toolshop
+      run: docker compose up -d --build
+
+    - name: Migrate and seed the database
+      shell: bash
+      working-directory: ${{ runner.temp }}/toolshop
+      run: |
+        # The database container needs a moment before it accepts connections.
+        for i in $(seq 1 20); do
+          if docker compose exec -T laravel-api php artisan migrate:refresh --seed; then
+            exit 0
+          fi
+          echo "Database not ready yet (attempt $i), waiting..."
+          sleep 6
+        done
+        docker compose logs --tail=100
+        exit 1
+
+    - name: Wait until the app answers
+      shell: bash
+      run: |
+        for i in $(seq 1 40); do
+          if curl -fsS http://localhost:8091/products > /dev/null && curl -fsS http://localhost:4200 > /dev/null; then
+            echo "Toolshop is up"
+            exit 0
+          fi
+          sleep 5
+        done
+        echo "Toolshop did not become ready"
+        docker compose -f "$RUNNER_TEMP/toolshop/docker-compose.yml" logs --tail=100 || true
+        exit 1

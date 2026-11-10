@@ -31,10 +31,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Start Toolshop (normal build)
+        uses: ./.github/actions/start-toolshop
+        with:
+          sprint-folder: sprint5
       - name: Run tests
-        run: npx playwright test --project=chromium --project=api --shard=${{ matrix.shard }}/2 --reporter=blob
+        run: npx playwright test --project=chromium --project=api --shard=${{ matrix.shard }}/2 --reporter=blob,list
         env:
-          TARGET: clean
+          TARGET: local
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -107,11 +111,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Start Toolshop (build with planted bugs)
+        uses: ./.github/actions/start-toolshop
+        with:
+          sprint-folder: sprint5-with-bugs
       - name: Run tests
         continue-on-error: true
         run: npx playwright test --project=chromium --project=api --reporter=json,html
         env:
-          TARGET: bugs
+          TARGET: local
           PLAYWRIGHT_HTML_OPEN: never
           PLAYWRIGHT_JSON_OUTPUT_NAME: results/bugs.json
       - name: Job summary
@@ -152,11 +160,16 @@ jobs:
         if: ${{ steps.baselines.outputs.exists == 'true' }}
       - run: npx playwright install --with-deps chromium
         if: ${{ steps.baselines.outputs.exists == 'true' }}
+      - name: Start Toolshop (normal build)
+        if: ${{ steps.baselines.outputs.exists == 'true' }}
+        uses: ./.github/actions/start-toolshop
+        with:
+          sprint-folder: sprint5
       - name: Compare screenshots
         if: ${{ steps.baselines.outputs.exists == 'true' }}
         run: npx playwright test --project=visual
         env:
-          TARGET: clean
+          TARGET: local
           PLAYWRIGHT_HTML_OPEN: never
       - uses: actions/upload-artifact@v4
         if: ${{ failure() && steps.baselines.outputs.exists == 'true' }}

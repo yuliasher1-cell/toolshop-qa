@@ -9,6 +9,7 @@ The same suite runs against two deployments:
 | ------- | ------------------------------------------------ | --------------------------------- |
 | `clean` | https://practicesoftwaretesting.com              | all tests pass                    |
 | `bugs`  | https://with-bugs.practicesoftwaretesting.com    | tests fail where bugs are planted |
+| `local` | Toolshop in Docker on `localhost:4200` / `:8091` | used by CI (normal or buggy build) |
 
 Every failure on the `bugs` target is analysed and documented in `docs/bugs/` (later stage).
 
@@ -34,6 +35,13 @@ Workflows live in `.github/workflows/`.
 | ----------------------------- | ------------------------------------- | ------------ |
 | `ci.yml`                      | push to `main`, pull requests, manual | Runs the suite on the clean app in 2 parallel shards, merges the shard results into one HTML report (published on GitHub Pages for `main`, kept as an artifact otherwise), runs the same suite against the buggy build without failing the workflow, and compares screenshots once baselines exist. Every run prints a pass/fail summary. |
 | `update-visual-baselines.yml` | manual                                | Renders the visual baselines on the CI runner and commits them. |
+
+**Why CI does not use the public site.** The public demo is behind a Cloudflare bot check that
+blocks browsers on GitHub-hosted runners (the page "Performing security verification" appears
+instead of the app). Bypassing it is not an option, so every CI job starts its own copy of Toolshop
+with Docker (`.github/actions/start-toolshop`): the normal build (`sprint5`) for the main suite and
+the buggy build (`sprint5-with-bugs`) for the bug-detection run. This also makes CI independent of
+the demo server's availability. The `clean` and `bugs` targets remain for local runs.
 
 One-time setup: in the repository go to *Settings, Pages* and set *Source* to *GitHub Actions*
 (on the free plan Pages needs a public repository).

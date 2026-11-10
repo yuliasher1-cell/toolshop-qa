@@ -21,10 +21,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Start Toolshop (normal build)
+        uses: ./.github/actions/start-toolshop
+        with:
+          sprint-folder: sprint5
       - name: Render baselines
         run: npx playwright test --project=visual --update-snapshots
         env:
-          TARGET: clean
+          TARGET: local
           PLAYWRIGHT_HTML_OPEN: never
       - name: Commit baselines
         run: |
