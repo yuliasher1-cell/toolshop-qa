@@ -1,0 +1,166 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # The suite against the normal app, split into two parallel shards.
+  test-clean:
+    name: Tests (clean app), shard ${{ matrix.shard }} of 2
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run tests
+        run: npx playwright test --project=chromium --project=api --shard=${{ matrix.shard }}/2 --reporter=blob
+        env:
+          TARGET: clean
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: blob-report-clean-${{ matrix.shard }}
+          path: blob-report
+          retention-days: 7
+
+  # Combines the shard results into one HTML report and one summary.
+  report:
+    name: Merge reports
+    needs: test-clean
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          path: all-blob-reports
+          pattern: blob-report-clean-*
+          merge-multiple: true
+      - name: Merge into one report
+        run: npx playwright merge-reports --reporter=html,json ./all-blob-reports
+        env:
+          PLAYWRIGHT_HTML_OPEN: never
+          PLAYWRIGHT_JSON_OUTPUT_NAME: results/clean.json
+      - name: Job summary
+        run: node scripts/summarize-results.mjs results/clean.json "Suite against the clean app"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: html-report-clean
+          path: playwright-report
+          retention-days: 14
+      - uses: actions/upload-pages-artifact@v3
+        if: ${{ github.ref == 'refs/heads/main' }}
+        with:
+          path: playwright-report
+
+  # Publishes the report on GitHub Pages (main branch only).
+  deploy-report:
+    name: Publish report to GitHub Pages
+    needs: report
+    if: ${{ !cancelled() && needs.report.result == 'success' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  # The same suite against the deliberately buggy build. Failures here are the point:
+  # they show the tests catch real defects, so they never fail the workflow.
+  test-bugs:
+    name: Tests (buggy build, failures expected)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run tests
+        continue-on-error: true
+        run: npx playwright test --project=chromium --project=api --reporter=json,html
+        env:
+          TARGET: bugs
+          PLAYWRIGHT_HTML_OPEN: never
+          PLAYWRIGHT_JSON_OUTPUT_NAME: results/bugs.json
+      - name: Job summary
+        if: ${{ always() }}
+        run: node scripts/summarize-results.mjs results/bugs.json "Suite against the buggy build (failures are expected)"
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: html-report-bugs
+          path: |
+            playwright-report
+            results
+          retention-days: 14
+
+  # Screenshot comparison. Baselines are rendered on this runner (see update-visual-baselines.yml),
+  # so the job is skipped until they exist.
+  visual:
+    name: Visual regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Look for baselines
+        id: baselines
+        run: |
+          if ls tests/visual/*-snapshots/*.png > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Visual regression skipped::No baselines yet. Run the Update visual baselines workflow once."
+          fi
+      - uses: actions/setup-node@v4
+        if: ${{ steps.baselines.outputs.exists == 'true' }}
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        if: ${{ steps.baselines.outputs.exists == 'true' }}
+      - run: npx playwright install --with-deps chromium
+        if: ${{ steps.baselines.outputs.exists == 'true' }}
+      - name: Compare screenshots
+        if: ${{ steps.baselines.outputs.exists == 'true' }}
+        run: npx playwright test --project=visual
+        env:
+          TARGET: clean
+          PLAYWRIGHT_HTML_OPEN: never
+      - uses: actions/upload-artifact@v4
+        if: ${{ failure() && steps.baselines.outputs.exists == 'true' }}
+        with:
+          name: visual-diff
+          path: test-results
+          retention-days: 14

@@ -26,6 +26,24 @@ npm run test:ui         # UI project only
 npm run report          # open the last HTML report
 ```
 
+## Continuous integration
+
+Workflows live in `.github/workflows/`.
+
+| Workflow                      | When                                  | What it does |
+| ----------------------------- | ------------------------------------- | ------------ |
+| `ci.yml`                      | push to `main`, pull requests, manual | Runs the suite on the clean app in 2 parallel shards, merges the shard results into one HTML report (published on GitHub Pages for `main`, kept as an artifact otherwise), runs the same suite against the buggy build without failing the workflow, and compares screenshots once baselines exist. Every run prints a pass/fail summary. |
+| `update-visual-baselines.yml` | manual                                | Renders the visual baselines on the CI runner and commits them. |
+
+One-time setup: in the repository go to *Settings, Pages* and set *Source* to *GitHub Actions*
+(on the free plan Pages needs a public repository).
+
+**Visual regression.** Screenshots depend on the operating system's fonts, so baselines are always
+rendered on the CI runner, never on a developer machine. The `visual` project therefore exists only
+when `CI` is set, and local runs skip it. After the first push, run *Update visual baselines* once
+(*Actions, Run workflow*); later the same workflow accepts an intended UI change. A failing
+comparison uploads the expected, actual and diff images as the `visual-diff` artifact.
+
 ## Design decisions
 
 - **No dependency on shared demo accounts.** The public demo users are shared by everyone, and the
@@ -64,6 +82,9 @@ src/pages/      Page Objects (home, product, cart, login, header)
 src/fixtures/   custom Playwright fixtures (api, newUser, page objects)
 tests/api/      API + contract tests
 tests/ui/       browser tests
+tests/visual/   screenshot comparison (runs in CI only)
+scripts/        helper scripts (results summary)
+.github/        CI workflows
 docs/openapi/   Toolshop OpenAPI specification (reference)
 docs/findings/  findings about the application under test
 ```
@@ -74,5 +95,5 @@ docs/findings/  findings about the application under test
 - [x] Stage 2: API client, Zod schemas, fixtures, auth + products contract tests
 - [x] Stage 3: Page Objects, UI scenarios (catalog, cart, login)
 - [x] Stage 4: session reuse (storageState), hybrid API + UI tests, accessibility checks (axe)
-- [ ] Stage 5: GitHub Actions (sharding, HTML report on GitHub Pages), visual regression with baselines built in CI
+- [x] Stage 5: GitHub Actions (sharding, HTML report on GitHub Pages), visual regression with baselines built in CI
 - [ ] Stage 6: bug reports, test strategy, optional AI failure summary
