@@ -31,4 +31,12 @@ export class ToolshopApi {
   getProduct(id: string): Promise<APIResponse> {
     return this.request.get(this.url(`/products/${id}`));
   }
+
+  /** Requires a bearer token obtained from login(). */
+  addFavorite(token: string, productId: string): Promise<APIResponse> {
+    return this.request.post(this.url('/favorites'), {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { product_id: productId },
+    });
+  }
 }

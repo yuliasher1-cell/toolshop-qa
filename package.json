@@ -1,6 +1,6 @@
 {
   "name": "toolshop-qa",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "description": "Playwright + TypeScript QA framework (UI + API + contract) for the Toolshop demo app",
   "private": true,
   "scripts": {
@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
     "@playwright/test": "^1.50.0",
     "@types/node": "^22.0.0",
     "cross-env": "^7.0.3",

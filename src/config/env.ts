@@ -36,6 +36,9 @@ function resolveTarget(): Target {
 
 export const env: Environment = ENVIRONMENTS[resolveTarget()];
 
+/** Toolshop marks elements with data-test, so getByTestId('email') matches data-test="email". */
+export const TEST_ID_ATTRIBUTE = 'data-test';
+
 /** Public demo accounts published by the Toolshop project. */
 export const users = {
   customer: { email: 'customer@practicesoftwaretesting.com', password: 'welcome01' },

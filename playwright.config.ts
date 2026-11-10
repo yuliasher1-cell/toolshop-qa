@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { env } from './src/config/env';
+import { env, TEST_ID_ATTRIBUTE } from './src/config/env';
 
 export default defineConfig({
   testDir: './tests',
@@ -15,7 +15,7 @@ export default defineConfig({
   use: {
     baseURL: env.baseURL,
     // Toolshop marks elements with data-test, so getByTestId('email') matches data-test="email"
-    testIdAttribute: 'data-test',
+    testIdAttribute: TEST_ID_ATTRIBUTE,
     actionTimeout: 15_000,
     navigationTimeout: 45_000,
     trace: 'retain-on-failure',

@@ -38,6 +38,16 @@ npm run report          # open the last HTML report
   a small number of workers, one retry locally (retried passes show up as "flaky" in the report)
   and generous timeouts. Tests check the HTTP status before validating a schema, so a server error
   is never mistaken for a contract violation.
+- **Sign in once per worker.** A worker-scoped fixture registers a user through the API, signs in
+  through the UI a single time and saves the session (`storageState`). Tests written with
+  `authedTest` start already signed in, so they skip the login form; the login tests themselves
+  still use the normal, signed-out `test`.
+- **Hybrid tests.** Setup goes through the fast API, verification through the UI (for example a
+  favourite added by the API must appear on the favourites page).
+- **Accessibility as a regression gate.** axe scans fail the build on any *new* serious or critical
+  WCAG 2 A/AA violation; problems that already exist are listed per page in a known-issues map (described in
+  `docs/findings/accessibility.md`) rather than
+  hidden. The full axe report is attached to every test result.
 - **Contract tests with Zod.** Response schemas in `src/schemas/` are derived from the OpenAPI spec
   (`docs/openapi/`). `parseContract` reports every violated field in one readable error.
 - **Thin API client.** `ToolshopApi` returns raw responses; the tests decide what to assert.
@@ -55,6 +65,7 @@ src/fixtures/   custom Playwright fixtures (api, newUser, page objects)
 tests/api/      API + contract tests
 tests/ui/       browser tests
 docs/openapi/   Toolshop OpenAPI specification (reference)
+docs/findings/  findings about the application under test
 ```
 
 ## Roadmap
@@ -62,6 +73,6 @@ docs/openapi/   Toolshop OpenAPI specification (reference)
 - [x] Stage 1: project skeleton, two targets, first UI and API smoke tests
 - [x] Stage 2: API client, Zod schemas, fixtures, auth + products contract tests
 - [x] Stage 3: Page Objects, UI scenarios (catalog, cart, login)
-- [ ] Stage 4: hybrid tests (API login + storageState), accessibility, visual checks
-- [ ] Stage 5: GitHub Actions (sharding, HTML report on GitHub Pages)
+- [x] Stage 4: session reuse (storageState), hybrid API + UI tests, accessibility checks (axe)
+- [ ] Stage 5: GitHub Actions (sharding, HTML report on GitHub Pages), visual regression with baselines built in CI
 - [ ] Stage 6: bug reports, test strategy, optional AI failure summary
