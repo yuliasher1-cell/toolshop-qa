@@ -17,13 +17,10 @@ runs:
       shell: bash
       working-directory: ${{ runner.temp }}/toolshop
       run: |
-        [ -f .env ] || { [ -f .env.example ] && cp .env.example .env; } || touch .env
-        if grep -q '^SPRINT_FOLDER=' .env; then
-          sed -i "s|^SPRINT_FOLDER=.*|SPRINT_FOLDER=${{ inputs.sprint-folder }}|" .env
-        else
-          echo "SPRINT_FOLDER=${{ inputs.sprint-folder }}" >> .env
-        fi
-        grep SPRINT_FOLDER .env
+        # docker-compose.yml mounts ./${SPRINT}/API, and the repository's .env sets SPRINT.
+        echo "SPRINT=${{ inputs.sprint-folder }}" > .env
+        cat .env
+        ls -a "${{ inputs.sprint-folder }}/API" | grep -i "^\.env" || true
 
     - name: Start containers
       shell: bash
@@ -48,16 +45,21 @@ runs:
         docker compose logs --tail=50 composer
         exit 1
 
-    - name: Prepare Laravel keys
+    - name: Prepare Laravel (permissions, keys)
       shell: bash
       working-directory: ${{ runner.temp }}/toolshop
       run: |
-        docker compose exec -T laravel-api sh -c '
-          pwd
+        # The composer container chowns the sources to its own www-data (uid 82), while PHP-FPM runs
+        # as another user, so Laravel cannot write logs or cache and answers 500 with an empty body.
+        docker compose exec -T -u root laravel-api sh -c '
           [ -f .env ] || cp .env.example .env
           grep -q "^APP_KEY=.\+" .env || php artisan key:generate --force
           grep -q "^JWT_SECRET=.\+" .env || php artisan jwt:secret --force || true
+          mkdir -p storage/logs storage/framework/cache storage/framework/sessions storage/framework/views bootstrap/cache
+          chmod -R a+rwX storage bootstrap/cache
+          chmod a+r .env
           php artisan config:clear || true
+          php -v | head -n1
         '
 
     - name: Migrate and seed the database
@@ -92,6 +94,8 @@ runs:
         echo
         echo "--- Last application errors (first line of each) ---"
         docker compose exec -T laravel-api sh -c 'grep -h "\.ERROR" storage/logs/*.log 2>/dev/null | tail -n 3 | cut -c1-900; ls -la storage/logs; php -v | head -n1; grep -E "^(APP_|DB_|JWT_)" .env | sed -E "s/(KEY|SECRET)=.*/\1=<hidden>/"' || true
+        echo "--- Request replayed from the command line (shows PHP fatal errors) ---"
+        docker compose exec -T laravel-api sh -c 'cd public && REQUEST_METHOD=GET REQUEST_URI=/products SCRIPT_FILENAME=index.php SCRIPT_NAME=/index.php php -d display_errors=1 -d error_reporting=-1 index.php 2>&1 | head -c 2500' || true
         echo "--- nginx error log (web) ---"
         docker compose logs --tail=15 web 2>&1 | grep -i "error\|fastcgi" | cut -c1-500 || true
         echo "--- php-fpm (laravel-api) ---"
