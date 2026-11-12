@@ -77,28 +77,57 @@ runs:
         docker compose logs --tail=100 laravel-api
         exit 1
 
-    - name: Wait until the app answers
+    - name: Wait until the API answers
       shell: bash
       working-directory: ${{ runner.temp }}/toolshop
       run: |
         for i in $(seq 1 40); do
-          if curl -fsS http://localhost:8091/products > /dev/null && curl -fsS http://localhost:4200 > /dev/null; then
-            echo "Toolshop is up"
+          if curl -fsS http://localhost:8091/products > /dev/null; then
+            echo "API is up"
             exit 0
           fi
           sleep 5
         done
-        echo "=== Toolshop did not become ready ==="
+        echo "=== API did not become ready ==="
         echo "--- API response (/products) ---"
         curl -si -H 'Accept: application/json' http://localhost:8091/products | head -c 2500 || true
         echo
-        echo "--- Last application errors (first line of each) ---"
-        docker compose exec -T laravel-api sh -c 'grep -h "\.ERROR" storage/logs/*.log 2>/dev/null | tail -n 3 | cut -c1-900; ls -la storage/logs; php -v | head -n1; grep -E "^(APP_|DB_|JWT_)" .env | sed -E "s/(KEY|SECRET)=.*/\1=<hidden>/"' || true
-        echo "--- Request replayed from the command line (shows PHP fatal errors) ---"
+        echo "--- Last application errors ---"
+        docker compose exec -T laravel-api sh -c 'grep -h "\.ERROR" storage/logs/*.log 2>/dev/null | tail -n 3 | cut -c1-900; ls -la storage/logs' || true
+        echo "--- Request replayed from the command line ---"
         docker compose exec -T laravel-api sh -c 'cd public && REQUEST_METHOD=GET REQUEST_URI=/products SCRIPT_FILENAME=index.php SCRIPT_NAME=/index.php php -d display_errors=1 -d error_reporting=-1 index.php 2>&1 | head -c 2500' || true
-        echo "--- nginx error log (web) ---"
-        docker compose logs --tail=15 web 2>&1 | grep -i "error\|fastcgi" | cut -c1-500 || true
-        echo "--- php-fpm (laravel-api) ---"
-        docker compose logs --tail=15 laravel-api 2>&1 | cut -c1-400 || true
+        docker compose ps -a
+        exit 1
+
+    - name: Wait until the web UI answers
+      shell: bash
+      working-directory: ${{ runner.temp }}/toolshop
+      run: |
+        # The UI container installs npm packages and compiles the Angular app on every start, which
+        # takes a few minutes. If it crashed (for example a network hiccup during npm install),
+        # start it again, up to two times.
+        restarts=0
+        for i in $(seq 1 90); do
+          if curl -fsS http://localhost:4200 > /dev/null; then
+            echo "Web UI is up"
+            exit 0
+          fi
+          state=$(docker compose ps -a angular-ui --format '{{.State}}' 2>/dev/null | head -n1)
+          if [ "$state" = "exited" ]; then
+            echo "--- angular-ui exited, last log lines ---"
+            docker compose logs --tail=40 angular-ui 2>&1 | cut -c1-300
+            if [ "$restarts" -ge 2 ]; then
+              echo "angular-ui keeps crashing"
+              docker compose ps -a
+              exit 1
+            fi
+            restarts=$((restarts + 1))
+            echo "Starting angular-ui again (attempt $restarts)"
+            docker compose up -d angular-ui
+          fi
+          sleep 5
+        done
+        echo "=== Web UI did not become ready ==="
+        docker compose logs --tail=60 angular-ui 2>&1 | cut -c1-300
         docker compose ps -a
         exit 1
