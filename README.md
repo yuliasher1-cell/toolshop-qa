@@ -1,4 +1,6 @@
 # toolshop-qa
+https://yuliasher1-cell.github.io/toolshop-qa/
+
 
 Playwright + TypeScript test automation framework (UI + API + contract) for the public
 [Toolshop](https://practicesoftwaretesting.com) demo application.
