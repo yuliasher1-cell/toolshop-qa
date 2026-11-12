@@ -39,4 +39,44 @@ export class ToolshopApi {
       data: { product_id: productId },
     });
   }
+
+  /** Logs in and returns the bearer token. Fails loudly: it is a precondition, not the thing under test. */
+  async tokenFor(email: string, password: string): Promise<string> {
+    const response = await this.login(email, password);
+    if (response.status() !== 200) {
+      throw new Error(`Precondition failed: login for ${email} returned ${response.status()}: ${await response.text()}`);
+    }
+    return (await response.json()).access_token as string;
+  }
+
+  /** Generic authenticated (or anonymous, when token is omitted) GET. */
+  get(path: string, token?: string): Promise<APIResponse> {
+    return this.request.get(this.url(path), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  }
+
+  createBrand(token: string, brand: { name: string; slug: string }): Promise<APIResponse> {
+    return this.request.post(this.url('/brands'), {
+      headers: { Authorization: `Bearer ${token}` },
+      data: brand,
+    });
+  }
+
+  /** DELETE with an optional token (omit it to call the endpoint anonymously). */
+  deleteBrand(id: string | number, token?: string): Promise<APIResponse> {
+    return this.request.delete(this.url(`/brands/${id}`), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+  }
+
+  getBrand(id: string | number): Promise<APIResponse> {
+    return this.request.get(this.url(`/brands/${id}`));
+  }
+
+  getInvoices(token: string): Promise<APIResponse> {
+    return this.get('/invoices', token);
+  }
+
+  getUser(id: string | number, token: string): Promise<APIResponse> {
+    return this.get(`/users/${id}`, token);
+  }
 }

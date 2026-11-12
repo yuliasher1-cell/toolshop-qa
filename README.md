@@ -1,21 +1,21 @@
 # toolshop-qa
-   [![CI](https://github.com/yuliasher1-cell/toolshop-qa/actions/workflows/ci.yml/badge.svg)](https://github.com/yuliasher1-cell/toolshop-qa/actions/workflows/ci.yml)
-
-   **Живой отчёт о тестах:** https://yuliasher1-cell.github.io/toolshop-qa/
-
 
 Playwright + TypeScript test automation framework (UI + API + contract) for the public
 [Toolshop](https://practicesoftwaretesting.com) demo application.
 
-The same suite runs against two deployments:
+Test targets:
 
-| Target  | App                                              | Expectation                       |
-| ------- | ------------------------------------------------ | --------------------------------- |
-| `clean` | https://practicesoftwaretesting.com              | all tests pass                    |
-| `bugs`  | https://with-bugs.practicesoftwaretesting.com    | tests fail where bugs are planted |
-| `local` | Toolshop in Docker on `localhost:4200` / `:8091` | used by CI (normal or buggy build) |
+| Target  | App                                              | Used for |
+| ------- | ------------------------------------------------ | -------- |
+| `clean` | https://practicesoftwaretesting.com              | local and manual runs against the public demo |
+| `local` | Toolshop in Docker on `localhost:4200` / `:8091` | CI (normal build, and the buggy build for the known-bugs suite) |
+| `bugs`  | https://with-bugs.practicesoftwaretesting.com    | optional manual runs of the known-bugs suite (URLs not verified) |
 
-Every failure on the `bugs` target is analysed and documented in `docs/bugs/` (later stage).
+The project also ships the deliberately buggy build of Toolshop (`sprint5-with-bugs`, 96 planted
+defects). It is an older generation of the app, so the functional suite is not run against it.
+Instead the **known-bugs suite** automates 12 documented defects (mostly API security and rules)
+and CI checks that each one still reproduces. Reports: [docs/bugs](docs/bugs/README.md).
+Test strategy: [docs/test-strategy.md](docs/test-strategy.md).
 
 ## Quick start
 
@@ -23,8 +23,10 @@ Every failure on the `bugs` target is analysed and documented in `docs/bugs/` (l
 npm install
 npx playwright install --with-deps chromium
 
-npm run test:clean      # everything against the clean app
-npm run test:bugs       # everything against the buggy build
+npm run test:clean        # everything against the public demo
+npm run test:known-bugs   # known-bugs suite on a normal build (correct behaviour asserted)
+# known-bugs suite on the buggy build (Toolshop buggy build running locally in Docker):
+npm run test:known-bugs:buggy
 npm run test:smoke      # only tests tagged @smoke
 npm run test:api        # API project only
 npm run test:ui         # UI project only
@@ -37,7 +39,7 @@ Workflows live in `.github/workflows/`.
 
 | Workflow                      | When                                  | What it does |
 | ----------------------------- | ------------------------------------- | ------------ |
-| `ci.yml`                      | push to `main`, pull requests, manual | Runs the suite on the clean app in 2 parallel shards, merges the shard results into one HTML report (published on GitHub Pages for `main`, kept as an artifact otherwise), runs the same suite against the buggy build without failing the workflow, and compares screenshots once baselines exist. Every run prints a pass/fail summary. |
+| `ci.yml`                      | push to `main`, pull requests, manual | Starts Toolshop in Docker and runs the suite in 2 parallel shards, merges the shard results into one HTML report (published on GitHub Pages for `main`, kept as an artifact otherwise), runs the known-bugs suite against the buggy build (green while every defect still reproduces), and compares screenshots once baselines exist. Every run prints a pass/fail summary. |
 | `update-visual-baselines.yml` | manual                                | Renders the visual baselines on the CI runner and commits them. |
 
 **Why CI does not use the public site.** The public demo is behind a Cloudflare bot check that
@@ -81,7 +83,10 @@ comparison uploads the expected, actual and diff images as the `visual-diff` art
 - **Contract tests with Zod.** Response schemas in `src/schemas/` are derived from the OpenAPI spec
   (`docs/openapi/`). `parseContract` reports every violated field in one readable error.
 - **Thin API client.** `ToolshopApi` returns raw responses; the tests decide what to assert.
-- **Environment switch.** One `TARGET` variable selects the clean or the buggy deployment.
+- **Environment switch.** One `TARGET` variable selects the public demo, the public buggy site or a local Docker copy.
+- **Tests for planted bugs assert correct behaviour.** The helper `verifyBug` runs the assertion as is on a
+  normal build and expects it to fail on the buggy build, so a fixed bug or a test that no longer reaches
+  the defect becomes visible. Set-up runs before the helper, so a broken precondition is never mistaken for a bug.
 
 ## Project layout
 
@@ -94,11 +99,14 @@ src/pages/      Page Objects (home, product, cart, login, header)
 src/fixtures/   custom Playwright fixtures (api, newUser, page objects)
 tests/api/      API + contract tests
 tests/ui/       browser tests
+tests/known-bugs/ documented defects of the buggy build (see docs/bugs)
 tests/visual/   screenshot comparison (runs in CI only)
 scripts/        helper scripts (results summary)
 .github/        CI workflows
 docs/openapi/   Toolshop OpenAPI specification (reference)
 docs/findings/  findings about the application under test
+docs/bugs/      bug reports for the known-bugs suite
+docs/test-strategy.md  what is tested, at which level, and why
 ```
 
 ## Roadmap
@@ -108,4 +116,5 @@ docs/findings/  findings about the application under test
 - [x] Stage 3: Page Objects, UI scenarios (catalog, cart, login)
 - [x] Stage 4: session reuse (storageState), hybrid API + UI tests, accessibility checks (axe)
 - [x] Stage 5: GitHub Actions (sharding, HTML report on GitHub Pages), visual regression with baselines built in CI
-- [ ] Stage 6: bug reports, test strategy, optional AI failure summary
+- [x] Stage 6: known-bugs suite with bug reports, test strategy
+- [ ] Optional: AI-generated failure summary

@@ -35,6 +35,13 @@ export default defineConfig({
       testDir: './tests/api',
       use: { baseURL: env.apiURL },
     },
+    // Documented defects of the buggy build. On the normal build these tests assert correct
+    // behaviour and pass; on the buggy build (BUGGY_BUILD=true) they expect the defect.
+    {
+      name: 'known-bugs',
+      testDir: './tests/known-bugs',
+      use: { ...devices['Desktop Chrome'] },
+    },
     // Baselines are rendered on the Linux CI runner, and fonts differ between operating systems,
     // so this project only exists in CI. Locally the visual tests are simply not part of the run.
     ...(process.env.CI

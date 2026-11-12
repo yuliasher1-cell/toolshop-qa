@@ -44,6 +44,13 @@ function resolveTarget(): Target {
 
 export const env: Environment = ENVIRONMENTS[resolveTarget()];
 
+/**
+ * True when the application under test is the deliberately buggy build ("sprint5-with-bugs").
+ * Set BUGGY_BUILD=true when the local target runs that build; the public "bugs" target implies it.
+ * The known-bugs suite uses this to expect the documented defects instead of correct behaviour.
+ */
+export const isBuggyBuild: boolean = process.env.BUGGY_BUILD === 'true' || env.name === 'bugs';
+
 /** Toolshop marks elements with data-test, so getByTestId('email') matches data-test="email". */
 export const TEST_ID_ATTRIBUTE = 'data-test';
 
