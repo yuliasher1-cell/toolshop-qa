@@ -30,6 +30,36 @@ runs:
       working-directory: ${{ runner.temp }}/toolshop
       run: docker compose up -d --build
 
+    - name: Wait for dependencies to install
+      shell: bash
+      working-directory: ${{ runner.temp }}/toolshop
+      run: |
+        # The composer container installs the PHP packages; the API returns 500 until it is done.
+        for i in $(seq 1 60); do
+          state=$(docker compose ps -a composer --format '{{.State}}' 2>/dev/null | head -n1)
+          echo "composer: ${state:-unknown} (check $i)"
+          if [ "$state" = "exited" ]; then
+            docker compose ps -a composer --format '{{.ExitCode}}' | head -n1
+            exit 0
+          fi
+          sleep 5
+        done
+        echo "composer did not finish in time"
+        docker compose logs --tail=50 composer
+        exit 1
+
+    - name: Prepare Laravel keys
+      shell: bash
+      working-directory: ${{ runner.temp }}/toolshop
+      run: |
+        docker compose exec -T laravel-api sh -c '
+          pwd
+          [ -f .env ] || cp .env.example .env
+          grep -q "^APP_KEY=.\+" .env || php artisan key:generate --force
+          grep -q "^JWT_SECRET=.\+" .env || php artisan jwt:secret --force || true
+          php artisan config:clear || true
+        '
+
     - name: Migrate and seed the database
       shell: bash
       working-directory: ${{ runner.temp }}/toolshop
@@ -42,11 +72,12 @@ runs:
           echo "Database not ready yet (attempt $i), waiting..."
           sleep 6
         done
-        docker compose logs --tail=100
+        docker compose logs --tail=100 laravel-api
         exit 1
 
     - name: Wait until the app answers
       shell: bash
+      working-directory: ${{ runner.temp }}/toolshop
       run: |
         for i in $(seq 1 40); do
           if curl -fsS http://localhost:8091/products > /dev/null && curl -fsS http://localhost:4200 > /dev/null; then
@@ -55,6 +86,10 @@ runs:
           fi
           sleep 5
         done
-        echo "Toolshop did not become ready"
-        docker compose -f "$RUNNER_TEMP/toolshop/docker-compose.yml" logs --tail=100 || true
+        echo "Toolshop did not become ready. Response of the API:"
+        curl -si http://localhost:8091/products | head -c 1500 || true
+        echo
+        echo "Laravel log:"
+        docker compose exec -T laravel-api sh -c 'tail -n 40 storage/logs/laravel.log 2>/dev/null || ls -la storage/logs' || true
+        docker compose ps -a
         exit 1
