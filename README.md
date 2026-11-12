@@ -1,5 +1,7 @@
 # toolshop-qa
-https://yuliasher1-cell.github.io/toolshop-qa/
+   [![CI](https://github.com/yuliasher1-cell/toolshop-qa/actions/workflows/ci.yml/badge.svg)](https://github.com/yuliasher1-cell/toolshop-qa/actions/workflows/ci.yml)
+
+   **Живой отчёт о тестах:** https://yuliasher1-cell.github.io/toolshop-qa/
 
 
 Playwright + TypeScript test automation framework (UI + API + contract) for the public
