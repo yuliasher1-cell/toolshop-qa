@@ -21,6 +21,12 @@ runs:
         echo "SPRINT=${{ inputs.sprint-folder }}" > .env
         cat .env
         ls -a "${{ inputs.sprint-folder }}/API" | grep -i "^\.env" || true
+        # docker-compose.yml runs "node set-version.js" for every build, but the buggy build ships
+        # without that script. An empty stub lets the UI container start.
+        if [ ! -f "${{ inputs.sprint-folder }}/UI/set-version.js" ]; then
+          echo "// stub: this build has no version stamping" > "${{ inputs.sprint-folder }}/UI/set-version.js"
+          echo "Created a stub set-version.js"
+        fi
 
     - name: Start containers
       shell: bash
