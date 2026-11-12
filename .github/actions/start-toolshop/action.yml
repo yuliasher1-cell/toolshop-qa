@@ -86,10 +86,15 @@ runs:
           fi
           sleep 5
         done
-        echo "Toolshop did not become ready. Response of the API:"
-        curl -si http://localhost:8091/products | head -c 1500 || true
+        echo "=== Toolshop did not become ready ==="
+        echo "--- API response (/products) ---"
+        curl -si -H 'Accept: application/json' http://localhost:8091/products | head -c 2500 || true
         echo
-        echo "Laravel log:"
-        docker compose exec -T laravel-api sh -c 'tail -n 40 storage/logs/laravel.log 2>/dev/null || ls -la storage/logs' || true
+        echo "--- Last application errors (first line of each) ---"
+        docker compose exec -T laravel-api sh -c 'grep -h "\.ERROR" storage/logs/*.log 2>/dev/null | tail -n 3 | cut -c1-900; ls -la storage/logs; php -v | head -n1; grep -E "^(APP_|DB_|JWT_)" .env | sed -E "s/(KEY|SECRET)=.*/\1=<hidden>/"' || true
+        echo "--- nginx error log (web) ---"
+        docker compose logs --tail=15 web 2>&1 | grep -i "error\|fastcgi" | cut -c1-500 || true
+        echo "--- php-fpm (laravel-api) ---"
+        docker compose logs --tail=15 laravel-api 2>&1 | cut -c1-400 || true
         docker compose ps -a
         exit 1
